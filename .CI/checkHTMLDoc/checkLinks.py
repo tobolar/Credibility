@@ -67,7 +67,10 @@ def _checkURL(url):
         rc = urllib2.urlopen(urllib2.Request(url, None, headers), context=ssl._create_unverified_context()).getcode()
     except urllib2.HTTPError as e:
         rc = e.code
-        if rc == 429:
+        if rc == 202:
+            print("Action accepted but not completed yet.")
+            rc = 200
+        elif rc == 429:
             # Ignore too many requests
             rc = 200
         elif rc in (301, 302):
