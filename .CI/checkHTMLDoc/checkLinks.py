@@ -10,11 +10,12 @@ Check Modelica HTML documentation for link validity
 
 import re
 import os
-try:
-    import urllib2
-except ImportError:
-    import urllib.request as urllib2
-import ssl
+# try:
+#     import urllib2
+# except ImportError:
+#     import urllib.request as urllib2
+import requests
+# import ssl
 
 from concurrent.futures import ProcessPoolExecutor as PoolExecutor
 
@@ -56,28 +57,36 @@ def _getURLs(path):
 
 def _checkURL(url):
     try:
-        rc = urllib2.urlopen(url).getcode()
+        allow_redirects=False
+        response = requests.head(url, allow_redirects=allow_redirects)
+        rc = response.status_code
+
+        # If requests.head not allowed -> requests.get
+        if rc == 405:
+            response = requests.get(url, allow_redirects=allow_redirects)
+            rc = response.status_code
         return (url, rc)
     except:
         if DOI_PATTERN.match(url):
             print("WARNING: Skip DOI-Link (per design, because of persistency): {url}")
             return (url, 200)
+
     try:
+        allow_redirects=True
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64)'}
-        rc = urllib2.urlopen(urllib2.Request(url, None, headers), context=ssl._create_unverified_context()).getcode()
-    except urllib2.HTTPError as e:
-        rc = e.code
-        if rc == 202:
-            print("Action accepted but not completed yet.")
-            rc = 200
-        elif rc == 429:
-            # Ignore too many requests
-            rc = 200
-        elif rc in (301, 302):
-            # Handle redirect errors
-            rc = urllib2.build_opener(urllib2.HTTPCookieProcessor).open(url).code
-    except:
-        rc = 0
+        response = requests.head(url, allow_redirects=allow_redirects, headers=headers)
+        rc = response.status_code
+
+        # If requests.head not allowed -> requests.get
+        if rc == 405:
+            response = requests.get(url, allow_redirects=allow_redirects, headers=headers)
+            rc = response.status_code
+    except requests.exceptions.TooManyRedirects:
+        # rc = 310
+        rc = 200
+    except requests.exceptions.RequestException as e:
+        print("Error ", e)
+        rc = 0  # unknown error
     return (url, rc)
 
 def checkLinks(path):
